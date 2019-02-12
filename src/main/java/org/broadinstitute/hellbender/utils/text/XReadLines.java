@@ -1,6 +1,7 @@
 package org.broadinstitute.hellbender.utils.text;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
 import org.broadinstitute.hellbender.utils.Utils;
 import org.broadinstitute.hellbender.utils.io.IOUtils;
 
@@ -96,7 +97,9 @@ public final class XReadLines implements Iterator<String>, Iterable<String>, Aut
      * @return all of the lines in the file.
      */
     public List<String> readLines() {
-        List<String> lines = new LinkedList<>();
+        // Using an ArrayList instead of LinkedList because it has the same add performance
+        // (asymptotically), but faster random access.
+        List<String> lines = new ArrayList<>();
         for ( String line : this ) {
             lines.add(line);
         }

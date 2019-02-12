@@ -204,37 +204,38 @@ public final class IntegrationTestSpec {
      */
     public static void assertEqualTextFiles(final Path resultFile, final Path expectedFile, final String commentPrefix) throws IOException {
 
-        final List<String> actualLines = new XReadLines(resultFile, true, commentPrefix).readLines();
-        final List<String> expectedLines = new XReadLines(expectedFile, true, commentPrefix).readLines();
+        XReadLines actual = new XReadLines(resultFile, true, commentPrefix);
+        XReadLines expected = new XReadLines(expectedFile, true, commentPrefix);
 
-        //For ease of debugging, we look at the lines first and only then check their counts
+        // For ease of debugging, we look at the lines first and only then check their counts.
+        // For performance, we stream the lines through instead of loading everything first.
         int numUnequalLines = 0;
-        final int minLen = Math.min(actualLines.size(), expectedLines.size());
-        for (int i = 0; i < minLen; i++) {
-
-            final String expectedLine = expectedLines.get(i);
-            final String actualLine = actualLines.get(i);
-
-            if ( !actualLine.equals(expectedLine) ) {
-                logger.error( "Line number " + i + " (not counting comments) expected " +
-                        expectedLine + " actual " + actualLine + '\n' +
-                        "Expected :" + expectedLine  + '\n' +
-                        "Actual   :" + actualLine  + '\n'
-                );
-                ++numUnequalLines;
-            }
+        int i = 0;
+        while (actual.hasNext() && expected.hasNext()) {
+          final String expectedLine = expected.next();
+          final String actualLine = actual.next();
+          if ( !actualLine.equals(expectedLine) ) {
+            logger.error( "Line number " + i + " (not counting comments) expected " +
+                expectedLine + " actual " + actualLine + '\n' +
+                "Expected :" + expectedLine  + '\n' +
+                "Actual   :" + actualLine  + '\n'
+            );
+            ++numUnequalLines;
+          }
+          i++;
         }
-        final boolean sizeMatches = actualLines.size() == expectedLines.size();
+
+        final boolean sizeMatches = (actual.hasNext() == expected.hasNext());
 
         // Check our error cases:
         if ( (numUnequalLines != 0) && (!sizeMatches) ) {
-            throw new AssertionError("File sizes are unequal - actual = " + actualLines.size() + ", expected = " + expectedLines.size() + " AND detected unequal lines: " + numUnequalLines);
+            throw new AssertionError("File sizes are unequal - actual = " + actual.readLines().size() + ", expected = " + expected.readLines().size() + " AND detected unequal lines: " + numUnequalLines);
         }
         else if ( numUnequalLines != 0 ) {
             throw new AssertionError("Detected unequal lines: " + numUnequalLines);
         }
         else if (!sizeMatches) {
-            throw new AssertionError("File sizes are unequal - actual = " + actualLines.size() + ", expected = " + expectedLines.size());
+            throw new AssertionError("File sizes are unequal - actual = " + actual.readLines().size() + ", expected = " + expected.readLines().size());
         }
     }
 
