@@ -372,8 +372,8 @@ task GermlineCNVCallerCaseMode {
         export MKL_NUM_THREADS=${default=8 cpu}
         export OMP_NUM_THREADS=${default=8 cpu}
 
-        mkdir contig-ploidy-calls-dir
-        tar xzf ${contig_ploidy_calls_tar} -C contig-ploidy-calls-dir
+        mkdir contig-ploidy-calls
+        tar xzf ${contig_ploidy_calls_tar} -C contig-ploidy-calls
 
         mkdir gcnv-model
         tar xzf ${gcnv_model_tar} -C gcnv-model
@@ -381,7 +381,7 @@ task GermlineCNVCallerCaseMode {
         gatk --java-options "-Xmx${command_mem_mb}m"  GermlineCNVCaller \
             --run-mode CASE \
             --input ${sep=" --input " read_count_files} \
-            --contig-ploidy-calls contig-ploidy-calls-dir \
+            --contig-ploidy-calls contig-ploidy-calls \
             --model gcnv-model \
             --output ${output_dir_} \
             --output-prefix case \
@@ -425,6 +425,9 @@ task GermlineCNVCallerCaseMode {
             tar czf case-gcnv-calls-shard-${scatter_index}-sample-$CURRENT_SAMPLE_WITH_LEADING_ZEROS.tar.gz -C ${output_dir_}/case-calls/SAMPLE_$CURRENT_SAMPLE .
             let CURRENT_SAMPLE=CURRENT_SAMPLE+1
         done
+
+        rm -r contig-ploidy-calls
+        rm -r gcnv-model
     >>>
 
     runtime {

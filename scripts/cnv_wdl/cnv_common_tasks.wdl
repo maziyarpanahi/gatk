@@ -405,21 +405,22 @@ task PostprocessGermlineCNVCalls {
             model_args="$model_args --model-shard-path MODEL_$index"
         done
 
-        mkdir extracted-contig-ploidy-calls
-        tar xzf ${contig_ploidy_calls_tar} -C extracted-contig-ploidy-calls
+        mkdir contig-ploidy-calls
+        tar xzf ${contig_ploidy_calls_tar} -C contig-ploidy-calls
 
         gatk --java-options "-Xmx${command_mem_mb}m" PostprocessGermlineCNVCalls \
             $calls_args \
             $model_args \
             ${sep=" " allosomal_contigs_args} \
             --autosomal-ref-copy-number ${ref_copy_number_autosomal_contigs} \
-            --contig-ploidy-calls extracted-contig-ploidy-calls \
+            --contig-ploidy-calls contig-ploidy-calls \
             --sample-index ${sample_index} \
             --output-genotyped-intervals ${genotyped_intervals_vcf_filename} \
             --output-genotyped-segments ${genotyped_segments_vcf_filename}
 
         rm -r CALLS_*
         rm -r MODEL_*
+        rm -r contig-ploidy-calls
     >>>
 
     runtime {
