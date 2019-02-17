@@ -861,25 +861,21 @@ public class AnalyzeMITESeq extends GATKTool {
         final List<Interval> refCoverage;
         final List<SNV> snvList;
         final int qualSum;
-        final int trimLen;
         final CodonTracker codonTracker;
 
         public ReadReport( final List<Interval> refCoverage,
                            final List<SNV> snvList,
                            final int qualSum,
-                           final int trimLen,
                            final CodonTracker codonTracker ) {
             this.refCoverage = refCoverage;
             this.snvList = snvList;
             this.qualSum = qualSum;
-            this.trimLen = trimLen;
             this.codonTracker = codonTracker;
         }
 
         public List<Interval> getRefCoverage() { return refCoverage; }
         public List<SNV> getVariations() { return snvList; }
         public int getQualSum() { return qualSum; }
-        public int getTrimLen() { return trimLen; }
         public CodonTracker getCodonTracker() { return codonTracker; }
     }
 
@@ -1057,7 +1053,6 @@ public class AnalyzeMITESeq extends GATKTool {
         int refCoverageBegin = 0;
         int refCoverageEnd = 0;
         int qualSum = 0;
-        int trimLen = 0;
 
         while ( true ) {
             if ( readIndex >= start ) {
@@ -1078,7 +1073,6 @@ public class AnalyzeMITESeq extends GATKTool {
                     }
                     variations.add(new SNV(refIndex, (byte)'-', readSeq[readIndex]));
                     qualSum += readQuals[readIndex];
-                    trimLen += 1;
                     codonTracker.push(refIndex, (byte)'+');
                 } else if ( cigarOperator == CigarOperator.M ) {
                     final byte call = (byte) (readSeq[readIndex] & LOWERCASE_MASK);
@@ -1091,7 +1085,6 @@ public class AnalyzeMITESeq extends GATKTool {
                         variations.add(new SNV(refIndex, refSeq[refIndex], readSeq[readIndex]));
                         qualSum += readQuals[readIndex];
                     }
-                    trimLen += 1;
                     if ( refIndex == refCoverageEnd ) {
                         refCoverageEnd += 1;
                     } else {
@@ -1125,13 +1118,12 @@ public class AnalyzeMITESeq extends GATKTool {
         refCoverageList.add(new Interval(refCoverageBegin, refCoverageEnd));
 
         if ( !variations.isEmpty() ) {
-            if ( trimLen < minTrimmedLength ||
-                    refCoverageEnd - variations.get(variations.size() - 1).getRefIndex() < minFlankingLength ||
+            if ( refCoverageEnd - variations.get(variations.size() - 1).getRefIndex() < minFlankingLength ||
                     variations.get(0).getRefIndex() - refCoverageList.get(0).getStart() < minFlankingLength ) {
                 variations.clear();
             }
         }
-        return new ReadReport(refCoverageList, variations, qualSum, trimLen, codonTracker);
+        return new ReadReport(refCoverageList, variations, qualSum, codonTracker);
     }
 
     private void applyReport( final ReadReport readReport, final int readLength ) {
@@ -1139,8 +1131,11 @@ public class AnalyzeMITESeq extends GATKTool {
         readReport.getCodonTracker().report( codonCounts );
 
         final List<Interval> refCoverageList = readReport.getRefCoverage();
+        int trimLen = 0;
         for ( final Interval refInterval : refCoverageList ) {
+            final int refIntervalStart = refInterval.getStart();
             final int refIntervalEnd = refInterval.getEnd();
+            trimLen += refIntervalEnd - refIntervalStart;
             for ( int idx = refInterval.getStart(); idx != refIntervalEnd; ++idx ) {
                 refCoverage[idx] += 1;
             }
@@ -1150,7 +1145,7 @@ public class AnalyzeMITESeq extends GATKTool {
         final int end = refCoverageList.get(refCoverageList.size()-1).getEnd();
         bumpIntervalCounter(start, end, readLength);
 
-        reportVariations(readReport.getVariations(), readReport.getQualSum(), readReport.getTrimLen());
+        reportVariations(readReport.getVariations(), readReport.getQualSum(), trimLen);
     }
 
     private void bumpIntervalCounter( final int start, final int end, final int readLength ) {
@@ -1190,6 +1185,7 @@ public class AnalyzeMITESeq extends GATKTool {
         Interval refInterval1 = refCoverageItr1.next();
         Interval refInterval2 = refCoverageItr2.next();
         Interval curInterval;
+        int trimLen = 0;
         if ( refInterval1.getStart() < refInterval2.getStart() ) {
             curInterval = refInterval1;
             refInterval1 = refCoverageItr1.hasNext() ? refCoverageItr1.next() : null;
@@ -1213,8 +1209,10 @@ public class AnalyzeMITESeq extends GATKTool {
                 refInterval2 = refCoverageItr2.hasNext() ? refCoverageItr2.next() : null;
             }
             if ( curInterval.getEnd() <= testInterval.getStart() ) {
+                final int refIntervalStart = curInterval.getStart();
                 final int refIntervalEnd = curInterval.getEnd();
-                for ( int idx = curInterval.getStart(); idx != refIntervalEnd; ++idx ) {
+                trimLen += refIntervalEnd - refIntervalStart;
+                for ( int idx = refIntervalStart; idx != refIntervalEnd; ++idx ) {
                     refCoverage[idx] += 1;
                 }
                 curInterval = testInterval;
@@ -1222,8 +1220,10 @@ public class AnalyzeMITESeq extends GATKTool {
                 curInterval = new Interval(curInterval.getStart(), testInterval.getEnd());
             }
         }
+        final int refIntervalStart = curInterval.getStart();
         final int refIntervalEnd = curInterval.getEnd();
-        for ( int idx = curInterval.getStart(); idx != refIntervalEnd; ++idx ) {
+        trimLen += refIntervalEnd - refIntervalStart;
+        for ( int idx = refIntervalStart; idx != refIntervalEnd; ++idx ) {
             refCoverage[idx] += 1;
         }
 
@@ -1241,12 +1241,12 @@ public class AnalyzeMITESeq extends GATKTool {
         final List<SNV> variations1 = readReport1.getVariations();
         final List<SNV> variations2 = readReport2.getVariations();
         if ( variations1.isEmpty() ) {
-            reportVariations(variations2, readReport2.getQualSum(), readReport2.getTrimLen());
+            reportVariations(variations2, readReport2.getQualSum(), trimLen);
         } else if ( variations2.isEmpty() ) {
-            reportVariations(variations1, readReport1.getQualSum(), readReport1.getTrimLen());
+            reportVariations(variations1, readReport1.getQualSum(), trimLen);
         } else if ( new SNVCollectionCount(variations1, 0, 0)
                 .equals(new SNVCollectionCount(variations2, 0, 0)) ) {
-            reportVariations(variations1, readReport1.getQualSum(), readReport1.getTrimLen());
+            reportVariations(variations1, readReport1.getQualSum(), trimLen);
         }
     }
 }
